@@ -1,0 +1,21 @@
+[project]
+name = "events-feed"
+version = "0.1.0"
+description = "Event discovery feed for computational epidemiology talks in Boston"
+requires-python = ">=3.12"
+dependencies = [
+    "requests",
+    "trafilatura",
+    "llm",
+    "llm-gemini",
+    "feedgen",
+    "pyyaml",
+    "icalendar",
+]
+
+[project.scripts]
+events-feed = "events_feed.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
