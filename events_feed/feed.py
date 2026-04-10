@@ -32,24 +32,24 @@ def generate_feed(config: dict, output_path: str = "feed.xml", upcoming_only: bo
         fe.id(f"urn:events-feed:{feed_id}:{event['content_hash']}")
         fe.title(_clean_xml(event["title"]))
 
-        # Build content
+        # Build content as HTML
         parts = []
         if event["speaker"]:
-            parts.append(f"Speaker: {event['speaker']}")
+            parts.append(f"<b>Speaker:</b> {event['speaker']}")
         if event["date"]:
-            parts.append(f"Date: {event['date']}")
+            parts.append(f"<b>Date:</b> {event['date']}")
         if event["time"]:
-            parts.append(f"Time: {event['time']}")
+            parts.append(f"<b>Time:</b> {event['time']}")
         if event["location"]:
-            parts.append(f"Location: {event['location']}")
+            parts.append(f"<b>Location:</b> {event['location']}")
         if event["venue"]:
-            parts.append(f"Venue: {event['venue']}")
+            parts.append(f"<b>Venue:</b> {event['venue']}")
         if event["description"]:
-            parts.append(f"\n{event['description']}")
+            parts.append(f"<p>{event['description']}</p>")
         if event["tags"]:
-            parts.append(f"\nTags: {event['tags']}")
+            parts.append(f"<b>Tags:</b> {event['tags']}")
 
-        fe.content(_clean_xml("\n".join(parts)), type="text")
+        fe.content(_clean_xml("<br>".join(parts)), type="html")
 
         if event["event_url"]:
             fe.link(href=event["event_url"])
@@ -111,6 +111,8 @@ def generate_ical(config: dict, output_path: str = "feed.ics", upcoming_only: bo
             parts.append(ev["description"])
         if ev.get("tags"):
             parts.append(f"Tags: {ev['tags']}")
+        if ev.get("url"):
+            parts.append(f"Source: {ev['url']}")
         if parts:
             event.add("description", "\n\n".join(parts))
 

@@ -1,0 +1,62 @@
+id: boston-compepi
+title: Boston Computational Epidemiology Events
+description: >
+  Talks, seminars, and workshops on computational epidemiology,
+  mathematical modeling, network science, and related fields in the Boston area
+model: gemini/gemini-2.5-flash-lite
+
+# export:
+#   s3:
+#     bucket: my-bucket
+#     prefix: feeds/events
+#     region: us-east-1
+#     profile: my-aws-profile
+
+sources:
+  - name: Northeastern AIM Seminar
+    url: https://aimath.sites.northeastern.edu/
+
+  - name: Harvard T.H. Chan School of Public Health Events
+    url: https://hsph.harvard.edu/events/feed/
+
+  - name: Harvard CCDD ID Epi Seminar Series
+    url: https://hsph.harvard.edu/research/communicable-disease-ccdd/id-epi-seminar-series-2025/
+
+  - name: Harvard Epidemiology Seminar Series
+    url: https://hsph.harvard.edu/department/epidemiology/seminar-series/
+
+  - name: Harvard Biostatistics Colloquium Series
+    url: https://hsph.harvard.edu/department/biostatistics/seminars-events/colloquium-seminar-series/
+
+  - name: Harvard Causal Inference Working Group
+    url: https://datascience.harvard.edu/programs/causal-inference/
+
+  - name: Harvard Data Science Institute Events
+    url: https://datascience.harvard.edu/events/
+
+  - name: Harvard Immunology and Infectious Diseases Events
+    url: https://hsph.harvard.edu/department/immunology-infectious-diseases/events/
+
+  - name: Harvard Global Health Thursday Brown Bag Series
+    url: https://hsph.harvard.edu/department/global-health-population/events/thursday-brown-bag-series/
+
+  - name: MIT Sloan System Dynamics Seminar
+    url: https://mitsloan.mit.edu/faculty/academic-groups/system-dynamics/seminars
+
+  - name: BU Dynamics Seminar
+    url: https://math.bu.edu/dynamics/seminar.html
+
+  - name: Brown-BU-UMass Joint Dynamics Seminar
+    url: https://sites.brown.edu/joint-dynamics-seminar/
+
+  - name: BU Statistics and Probability Seminar
+    url: https://www.bu.edu/stat/statistics-and-probability-seminar-series/
+
+  - name: BU CDS PhD Student Seminar
+    url: https://www.bu.edu/cds-faculty/research-impact/lectures-seminars/phd-student-seminar/
+
+  - name: BU Quantitative Biology Seminar
+    url: https://www.bu.edu/cds-faculty/research-impact/lectures-seminars/quantitative-biology-seminar/
+
+  - name: BU Population Science Seminar
+    url: https://sites.bu.edu/popsciseminar/

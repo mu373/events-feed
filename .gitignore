@@ -6,3 +6,6 @@ __pycache__/
 *.db
 logs/
 output/
+
+feeds/
+!feeds/example-feed/

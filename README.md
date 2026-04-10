@@ -37,5 +37,23 @@ source URL → requests → trafilatura (or RSS parser) → LLM extraction → S
 
 Content hashing skips LLM calls when a page hasn't changed. Event dedup uses a hash of title + date.
 
+## S3 Export
+
+Add an `export` block to `feed.yaml` to upload feeds to S3 after generation:
+
+```yaml
+export:
+  s3:
+    bucket: my-bucket
+    prefix: feeds/events
+    region: us-east-1
+    profile: my-aws-profile  # optional, uses default credentials if omitted
+```
+
+Install with S3 support:
+```
+uv sync --extra s3
+```
+
 ## License
 MIT

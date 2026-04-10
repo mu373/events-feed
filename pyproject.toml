@@ -13,6 +13,9 @@ dependencies = [
     "icalendar",
 ]
 
+[project.optional-dependencies]
+s3 = ["boto3"]
+
 [project.scripts]
 events-feed = "events_feed.cli:main"
 

@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     url TEXT NOT NULL UNIQUE,
-    source_type TEXT DEFAULT 'seminar_page',  -- seminar_page, search, social
+    source_type TEXT DEFAULT 'web',
     last_scraped TEXT,
     last_content_hash TEXT,  -- hash of extracted text, skip LLM if unchanged
     active INTEGER DEFAULT 1

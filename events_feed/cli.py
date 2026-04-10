@@ -31,7 +31,7 @@ def cmd_scrape(args):
         for source in config["sources"]:
             conn.execute(
                 "INSERT OR IGNORE INTO sources (name, url, source_type) VALUES (?, ?, ?)",
-                (source["name"], source["url"], source["source_type"]),
+                (source["name"], source["url"], source.get("source_type", "web")),
             )
         conn.commit()
 
@@ -108,6 +108,37 @@ def cmd_feed(args):
 
         generate_ical(config, str(ics_path), upcoming_only=not args.all)
         print(f"iCal feed written to {ics_path}")
+
+        # Export if configured
+        export = config.get("export", {})
+        if export.get("s3"):
+            _upload_s3(export["s3"], [xml_path, ics_path])
+
+
+def _upload_s3(s3_config: dict, paths: list[Path]) -> None:
+    try:
+        import boto3
+    except ImportError:
+        print("  boto3 not installed. Run: uv pip install boto3", file=sys.stderr)
+        return
+
+    bucket = s3_config["bucket"]
+    prefix = s3_config.get("prefix", "").strip("/")
+    region = s3_config.get("region")
+
+    profile = s3_config.get("profile")
+    session = boto3.Session(**({"profile_name": profile} if profile else {}))
+    client = session.client("s3", **({"region_name": region} if region else {}))
+
+    content_types = {".xml": "application/atom+xml", ".ics": "text/calendar"}
+
+    for path in paths:
+        key = f"{prefix}/{path.name}" if prefix else path.name
+        client.upload_file(
+            str(path), bucket, key,
+            ExtraArgs={"ContentType": content_types.get(path.suffix, "application/octet-stream")},
+        )
+        print(f"  Uploaded to s3://{bucket}/{key}")
 
 
 def cmd_list(args):
