@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from feedgen.feed import FeedGenerator
 from icalendar import Calendar, Event
@@ -13,9 +14,14 @@ def _clean_xml(text: str) -> str:
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
 
 
+def _get_tz(config: dict) -> ZoneInfo:
+    return ZoneInfo(config.get("timezone", "America/New_York"))
+
+
 def generate_feed(config: dict, output_path: str = "feed.xml", upcoming_only: bool = True) -> None:
     """Generate an Atom XML feed from stored events."""
     feed_id = config["id"]
+    tz = _get_tz(config)
 
     fg = FeedGenerator()
     fg.id(f"urn:events-feed:{feed_id}")
@@ -59,7 +65,7 @@ def generate_feed(config: dict, output_path: str = "feed.xml", upcoming_only: bo
         if event["date"]:
             try:
                 dt = datetime.fromisoformat(event["date"])
-                fe.updated(dt.replace(tzinfo=timezone.utc))
+                fe.updated(dt.replace(tzinfo=tz))
             except ValueError:
                 fe.updated(datetime.now(timezone.utc))
 
@@ -74,6 +80,7 @@ def generate_feed(config: dict, output_path: str = "feed.xml", upcoming_only: bo
 def generate_ical(config: dict, output_path: str = "feed.ics", upcoming_only: bool = True) -> None:
     """Generate an iCal feed from stored events."""
     feed_id = config["id"]
+    tz = _get_tz(config)
 
     cal = Calendar()
     cal.add("prodid", f"-//events-feed//{feed_id}//EN")
@@ -95,7 +102,7 @@ def generate_ical(config: dict, output_path: str = "feed.ics", upcoming_only: bo
                 if ev.get("time"):
                     h, m = ev["time"].split(":")
                     dt = dt.replace(hour=int(h), minute=int(m))
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=tz)
                 event.add("dtstart", dt)
                 event.add("dtend", dt + timedelta(hours=1))
             except (ValueError, TypeError):
@@ -124,10 +131,6 @@ def generate_ical(config: dict, output_path: str = "feed.ics", upcoming_only: bo
             loc_parts.append(ev["venue"])
         if loc_parts:
             event.add("location", ", ".join(loc_parts))
-
-        # URL
-        if ev.get("event_url") or ev.get("url"):
-            event.add("url", ev.get("event_url") or ev["url"])
 
         cal.add_component(event)
 

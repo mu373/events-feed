@@ -37,6 +37,14 @@ source URL → requests → trafilatura (or RSS parser) → LLM extraction → S
 
 Content hashing skips LLM calls when a page hasn't changed. Event dedup uses a hash of title + date.
 
+## Example Feed
+
+A live feed tracking computational epidemiology, Bayesian/causal inference, and network science events in the Boston area:
+
+- Atom: https://minami.me/feeds/events/boston-compepi.xml
+- iCal: https://minami.me/feeds/events/boston-compepi.ics
+- [Google Calendar](https://calendar.google.com/calendar/u/0/embed?src=teg6m88ngb1precshgtfgjsmvtnubpqs@import.calendar.google.com&ctz=America/New_York&mode=AGENDA&hl=en)
+
 ## S3 Export
 
 Add an `export` block to `feed.yaml` to upload feeds to S3 after generation:

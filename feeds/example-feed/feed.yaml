@@ -4,6 +4,7 @@ description: >
   Talks, seminars, and workshops on computational epidemiology,
   mathematical modeling, network science, and related fields in the Boston area
 model: gemini/gemini-2.5-flash-lite
+timezone: America/New_York
 
 # export:
 #   s3:
