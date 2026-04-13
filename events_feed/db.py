@@ -1,5 +1,17 @@
+import re
 import sqlite3
 from pathlib import Path
+
+_PLACEHOLDER_RE = re.compile(
+    r"\b(tbd|tba|untitled)\b|to be (determined|announced)",
+    re.IGNORECASE,
+)
+
+
+def is_placeholder_title(title: str | None) -> bool:
+    if not title or not title.strip():
+        return True
+    return bool(_PLACEHOLDER_RE.search(title))
 
 DB_PATH = Path(__file__).parent.parent / "events.db"
 
@@ -81,4 +93,86 @@ def get_all_events(conn: sqlite3.Connection, limit: int = 200) -> list[dict]:
         """SELECT * FROM events ORDER BY date DESC, time ASC LIMIT ?""",
         (limit,),
     ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def replace_placeholder(conn: sqlite3.Connection, event: dict) -> int | None:
+    """Delete a matching placeholder event so a real-titled replacement can be
+    inserted. Returns the id that was deleted, or None.
+
+    A placeholder qualifies when it shares (url, date, time) with the new event,
+    has a placeholder title, has no speaker, and has either no location or the
+    same location as the new event.
+    """
+    if is_placeholder_title(event.get("title")):
+        return None
+    date = event.get("date")
+    if not date:
+        return None
+
+    url = event.get("url")
+    time = event.get("time")
+    if time:
+        rows = conn.execute(
+            "SELECT * FROM events WHERE url = ? AND date = ? AND time = ?",
+            (url, date, time),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM events WHERE url = ? AND date = ? AND time IS NULL",
+            (url, date),
+        ).fetchall()
+
+    new_loc = (event.get("location") or "").strip().lower()
+    new_speaker = (event.get("speaker") or "").strip().lower()
+    for r in rows:
+        if not is_placeholder_title(r["title"]):
+            continue
+        existing_loc = (r["location"] or "").strip().lower()
+        if existing_loc and new_loc and existing_loc != new_loc:
+            continue
+        existing_speaker = (r["speaker"] or "").strip().lower()
+        if existing_speaker and new_speaker and existing_speaker != new_speaker:
+            continue
+        conn.execute("DELETE FROM events WHERE id = ?", (r["id"],))
+        conn.commit()
+        return r["id"]
+    return None
+
+
+def find_duplicate_groups(conn: sqlite3.Connection) -> list[list[dict]]:
+    """Return groups of events sharing (url, date, time) for manual review."""
+    rows = conn.execute(
+        """SELECT url, date, time FROM events
+           WHERE date IS NOT NULL
+           GROUP BY url, date, COALESCE(time, '')
+           HAVING COUNT(*) > 1
+           ORDER BY date, time"""
+    ).fetchall()
+    groups = []
+    for r in rows:
+        if r["time"] is None:
+            events = conn.execute(
+                "SELECT * FROM events WHERE url = ? AND date = ? AND time IS NULL ORDER BY id",
+                (r["url"], r["date"]),
+            ).fetchall()
+        else:
+            events = conn.execute(
+                "SELECT * FROM events WHERE url = ? AND date = ? AND time = ? ORDER BY id",
+                (r["url"], r["date"], r["time"]),
+            ).fetchall()
+        groups.append([dict(e) for e in events])
+    return groups
+
+
+def delete_events(conn: sqlite3.Connection, ids: list[int]) -> list[dict]:
+    """Delete events by ID, returning the rows that were deleted."""
+    if not ids:
+        return []
+    placeholders = ",".join("?" * len(ids))
+    rows = conn.execute(
+        f"SELECT * FROM events WHERE id IN ({placeholders})", ids
+    ).fetchall()
+    conn.execute(f"DELETE FROM events WHERE id IN ({placeholders})", ids)
+    conn.commit()
     return [dict(r) for r in rows]

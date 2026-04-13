@@ -6,7 +6,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .db import get_db, insert_event, get_upcoming_events
+from .db import (
+    get_db, insert_event, get_upcoming_events, delete_events,
+    replace_placeholder, find_duplicate_groups, is_placeholder_title,
+)
 from .scraper import fetch_page
 from .extract import extract_events
 from .feed import generate_feed, generate_ical
@@ -68,6 +71,9 @@ def cmd_scrape(args):
 
                 new_count = 0
                 for event in events:
+                    replaced_id = replace_placeholder(conn, event)
+                    if replaced_id:
+                        print(f"    * replaced placeholder #{replaced_id}")
                     if insert_event(conn, event):
                         new_count += 1
                         print(f"    + {event['title']} ({event.get('date', '?')})")
@@ -153,11 +159,11 @@ def cmd_list(args):
 
     for e in events:
         score = f" [{e['relevance_score']:.1f}]" if e.get("relevance_score") else ""
-        print(f"{e['date']} {(e.get('time') or ''):>5}  {e['title']}{score}")
+        print(f"#{e['id']:<4} {e['date']} {(e.get('time') or ''):>5}  {e['title']}{score}")
         if e.get("speaker"):
-            print(f"                  {e['speaker']}")
+            print(f"                       {e['speaker']}")
         if e.get("venue"):
-            print(f"                  @ {e['venue']}")
+            print(f"                       @ {e['venue']}")
         print()
 
 
@@ -187,6 +193,49 @@ def cmd_sources(args):
         print()
 
 
+def cmd_delete(args):
+    """Delete events by ID."""
+    conn = get_db()
+    deleted = delete_events(conn, args.ids)
+    conn.close()
+
+    found_ids = {e["id"] for e in deleted}
+    missing = [i for i in args.ids if i not in found_ids]
+
+    for e in deleted:
+        print(f"deleted #{e['id']}: {e['date']} {(e.get('time') or '')}  {e['title']}")
+    for i in missing:
+        print(f"no event with id #{i}", file=sys.stderr)
+
+
+def cmd_dedupe(args):
+    """Surface events sharing (url, date, time) for manual review."""
+    conn = get_db()
+    groups = find_duplicate_groups(conn)
+    conn.close()
+
+    if not groups:
+        print("No duplicate candidates.")
+        return
+
+    for group in groups:
+        first = group[0]
+        time = first["time"] or "(no time)"
+        print(f"\n{first['date']} {time}  —  {len(group)} events at same slot")
+        print(f"  {first['url']}")
+        for e in group:
+            flag = " [placeholder]" if is_placeholder_title(e["title"]) else ""
+            print(f"  #{e['id']:<4} {e['title']}{flag}")
+            meta = []
+            if e["speaker"]:
+                meta.append(f"speaker: {e['speaker']}")
+            if e["location"]:
+                meta.append(f"loc: {e['location']}")
+            if meta:
+                print(f"        {'  |  '.join(meta)}")
+    print(f"\n→ review and delete with: events-feed delete <id> ...")
+
+
 def cmd_feeds(args):
     """List available feeds."""
     for name in list_feeds():
@@ -211,6 +260,10 @@ def main():
     sub.add_parser("list", help="List upcoming events")
     sub.add_parser("sources", help="List all sources with status")
     sub.add_parser("feeds", help="List available feeds")
+    sub.add_parser("dedupe", help="Show events sharing (url, date, time) for manual review")
+
+    p_delete = sub.add_parser("delete", help="Delete events by ID")
+    p_delete.add_argument("ids", nargs="+", type=int, help="Event IDs to delete")
 
     args = parser.parse_args()
     if args.command == "scrape":
@@ -223,6 +276,10 @@ def main():
         cmd_sources(args)
     elif args.command == "feeds":
         cmd_feeds(args)
+    elif args.command == "delete":
+        cmd_delete(args)
+    elif args.command == "dedupe":
+        cmd_dedupe(args)
     else:
         parser.print_help()
 
