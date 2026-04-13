@@ -140,31 +140,6 @@ def replace_placeholder(conn: sqlite3.Connection, event: dict) -> int | None:
     return None
 
 
-def find_duplicate_groups(conn: sqlite3.Connection) -> list[list[dict]]:
-    """Return groups of events sharing (url, date, time) for manual review."""
-    rows = conn.execute(
-        """SELECT url, date, time FROM events
-           WHERE date IS NOT NULL
-           GROUP BY url, date, COALESCE(time, '')
-           HAVING COUNT(*) > 1
-           ORDER BY date, time"""
-    ).fetchall()
-    groups = []
-    for r in rows:
-        if r["time"] is None:
-            events = conn.execute(
-                "SELECT * FROM events WHERE url = ? AND date = ? AND time IS NULL ORDER BY id",
-                (r["url"], r["date"]),
-            ).fetchall()
-        else:
-            events = conn.execute(
-                "SELECT * FROM events WHERE url = ? AND date = ? AND time = ? ORDER BY id",
-                (r["url"], r["date"], r["time"]),
-            ).fetchall()
-        groups.append([dict(e) for e in events])
-    return groups
-
-
 def delete_events(conn: sqlite3.Connection, ids: list[int]) -> list[dict]:
     """Delete events by ID, returning the rows that were deleted."""
     if not ids:

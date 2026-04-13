@@ -8,7 +8,10 @@ from pathlib import Path
 
 from .db import (
     get_db, insert_event, get_upcoming_events, delete_events,
-    replace_placeholder, find_duplicate_groups, is_placeholder_title,
+    replace_placeholder, is_placeholder_title,
+)
+from .dedupe import (
+    find_candidate_buckets, detect_duplicates, categorize,
 )
 from .scraper import fetch_page
 from .extract import extract_events
@@ -209,31 +212,71 @@ def cmd_delete(args):
 
 
 def cmd_dedupe(args):
-    """Surface events sharing (url, date, time) for manual review."""
+    """LLM-assisted duplicate detection across events sharing a date."""
     conn = get_db()
-    groups = find_duplicate_groups(conn)
-    conn.close()
-
-    if not groups:
-        print("No duplicate candidates.")
+    buckets = find_candidate_buckets(conn, upcoming_only=not args.all)
+    if not buckets:
+        conn.close()
+        print("No candidate buckets (no dates have >= 2 events).")
         return
 
-    for group in groups:
-        first = group[0]
-        time = first["time"] or "(no time)"
-        print(f"\n{first['date']} {time}  —  {len(group)} events at same slot")
-        print(f"  {first['url']}")
-        for e in group:
+    candidate_count = sum(len(b) for b in buckets)
+    print(f"Sending {candidate_count} candidate events across {len(buckets)} date buckets to LLM...")
+    groups = detect_duplicates(buckets)
+
+    events_by_id = {}
+    for b in buckets:
+        for e in b:
+            events_by_id[e["id"]] = e
+
+    auto_delete, review = categorize(groups, events_by_id)
+
+    if not auto_delete and not review:
+        print("No duplicates found.")
+        conn.close()
+        return
+
+    def _print_entry(entry):
+        g = entry["group"]
+        print(f"  confidence: {g.confidence:.2f}  |  matches: {', '.join(g.matching_fields)}")
+        print(f"  reason: {g.reason}")
+        for i in entry["ids"]:
+            e = events_by_id[i]
+            marker = "keep" if i == entry["keep_id"] else "delete"
             flag = " [placeholder]" if is_placeholder_title(e["title"]) else ""
-            print(f"  #{e['id']:<4} {e['title']}{flag}")
+            print(f"    [{marker}] #{i:<4} {e['title']}{flag}")
             meta = []
-            if e["speaker"]:
+            if e.get("speaker"):
                 meta.append(f"speaker: {e['speaker']}")
-            if e["location"]:
+            if e.get("location"):
                 meta.append(f"loc: {e['location']}")
+            if e.get("url"):
+                meta.append(f"url: {e['url']}")
             if meta:
-                print(f"        {'  |  '.join(meta)}")
-    print(f"\n→ review and delete with: events-feed delete <id> ...")
+                print(f"          {'  |  '.join(meta)}")
+
+    if auto_delete:
+        header = "AUTO-DELETE (confident)" if args.apply else "WOULD AUTO-DELETE (dry-run)"
+        print(f"\n=== {header} — {len(auto_delete)} group(s) ===")
+        for entry in auto_delete:
+            print()
+            _print_entry(entry)
+
+    if review:
+        print(f"\n=== REVIEW — {len(review)} group(s) (weaker evidence or lower confidence) ===")
+        for entry in review:
+            print()
+            _print_entry(entry)
+        print(f"\n→ review and delete with: events-feed delete <id> ...")
+
+    if args.apply and auto_delete:
+        ids_to_delete = [i for entry in auto_delete for i in entry["delete_ids"]]
+        deleted = delete_events(conn, ids_to_delete)
+        print(f"\nDeleted {len(deleted)} event(s): {[e['id'] for e in deleted]}")
+    elif auto_delete and not args.apply:
+        print(f"\n(dry-run — re-run with --apply to delete the {sum(len(e['delete_ids']) for e in auto_delete)} event(s) above)")
+
+    conn.close()
 
 
 def cmd_feeds(args):
@@ -260,7 +303,9 @@ def main():
     sub.add_parser("list", help="List upcoming events")
     sub.add_parser("sources", help="List all sources with status")
     sub.add_parser("feeds", help="List available feeds")
-    sub.add_parser("dedupe", help="Show events sharing (url, date, time) for manual review")
+    p_dedupe = sub.add_parser("dedupe", help="LLM-assisted duplicate detection")
+    p_dedupe.add_argument("--apply", action="store_true", help="Actually delete confident duplicates (default: dry-run)")
+    p_dedupe.add_argument("--all", action="store_true", help="Include past events (default: upcoming only)")
 
     p_delete = sub.add_parser("delete", help="Delete events by ID")
     p_delete.add_argument("ids", nargs="+", type=int, help="Event IDs to delete")
