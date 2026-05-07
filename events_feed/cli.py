@@ -115,7 +115,7 @@ def cmd_feed(args):
         generate_feed(config, str(xml_path), upcoming_only=not args.all)
         print(f"Atom feed written to {xml_path}")
 
-        generate_ical(config, str(ics_path), upcoming_only=not args.all)
+        generate_ical(config, str(ics_path), upcoming_only=False)
         print(f"iCal feed written to {ics_path}")
 
         # Export if configured
