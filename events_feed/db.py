@@ -50,6 +50,8 @@ def get_db(db_path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    if "end_time" not in {r["name"] for r in conn.execute("PRAGMA table_info(events)")}:
+        conn.execute("ALTER TABLE events ADD COLUMN end_time TEXT")
     return conn
 
 
@@ -57,21 +59,27 @@ def insert_event(conn: sqlite3.Connection, event: dict) -> bool:
     """Insert an event, return True if new, False if duplicate."""
     defaults = {
         "content_hash": None, "title": None, "speaker": None, "date": None,
-        "time": None, "location": None, "venue": None, "description": None,
+        "time": None, "end_time": None, "location": None, "venue": None, "description": None,
         "url": None, "event_url": None, "tags": None, "relevance_score": None,
     }
     row = {**defaults, **event}
     try:
         conn.execute(
-            """INSERT INTO events (content_hash, title, speaker, date, time, location,
+            """INSERT INTO events (content_hash, title, speaker, date, time, end_time, location,
                venue, description, url, event_url, tags, relevance_score)
-               VALUES (:content_hash, :title, :speaker, :date, :time, :location,
+               VALUES (:content_hash, :title, :speaker, :date, :time, :end_time, :location,
                :venue, :description, :url, :event_url, :tags, :relevance_score)""",
             row,
         )
         conn.commit()
         return True
     except sqlite3.IntegrityError:
+        if row["event_url"]:
+            conn.execute("""UPDATE events SET time = COALESCE(:time, time),
+                            end_time = COALESCE(:end_time, end_time), event_url = :event_url
+                            WHERE content_hash = :content_hash AND url = :url
+                              AND (event_url IS NULL OR event_url = :event_url)""", row)
+        conn.commit()
         return False
 
 

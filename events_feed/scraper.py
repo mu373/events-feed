@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 
+from . import harvard
+
 import requests
 import trafilatura
 
@@ -75,6 +77,11 @@ def _get(url: str, timeout: int = 30) -> requests.Response:
 def fetch_page(url: str, timeout: int = 30) -> str | None:
     """Fetch a URL and extract clean text using trafilatura."""
     resp = _get(url, timeout)
+
+    if url == harvard.SOURCE:
+        cards = harvard.seminar_cards(resp.content, timeout)
+        if cards:
+            return cards
 
     # Auto-detect feeds
     if _is_feed(resp.headers.get("content-type", ""), resp.text):

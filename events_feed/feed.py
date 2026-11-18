@@ -102,9 +102,17 @@ def generate_ical(config: dict, output_path: str = "feed.ics", upcoming_only: bo
                 if ev.get("time"):
                     h, m = ev["time"].split(":")
                     dt = dt.replace(hour=int(h), minute=int(m))
-                dt = dt.replace(tzinfo=tz)
-                event.add("dtstart", dt)
-                event.add("dtend", dt + timedelta(hours=1))
+                    dt = dt.replace(tzinfo=tz)
+                    event.add("dtstart", dt)
+                    end = dt + timedelta(hours=1)
+                    if ev.get("end_time"):
+                        candidate = dt.replace(hour=int(ev["end_time"][:2]), minute=int(ev["end_time"][3:]))
+                        if candidate > dt:
+                            end = candidate
+                    event.add("dtend", end)
+                else:
+                    event.add("dtstart", dt.date())
+                    event.add("dtend", dt.date() + timedelta(days=1))
             except (ValueError, TypeError):
                 continue
         else:
@@ -112,12 +120,16 @@ def generate_ical(config: dict, output_path: str = "feed.ics", upcoming_only: bo
 
         # Description
         parts = []
+        if not ev.get("time"):
+            parts.append("Time: To be announced")
         if ev.get("speaker"):
             parts.append(f"Speaker: {ev['speaker']}")
         if ev.get("description"):
             parts.append(ev["description"])
         if ev.get("tags"):
             parts.append(f"Tags: {ev['tags']}")
+        if ev.get("event_url"):
+            event.add("url", ev["event_url"])
         if ev.get("url"):
             parts.append(f"Source: {ev['url']}")
         if parts:

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 import llm
 
+from . import harvard
 from .schema import ExtractionResult
 
 LOG_DIR = Path(__file__).parent.parent / "logs"
@@ -35,7 +36,7 @@ def extract_events(
     response = model.prompt(
         f"Today's date: {datetime.now().strftime('%Y-%m-%d')}\n"
         f"Source URL: {source_url}\n\nPage content:\n{text}",
-        system=prompt,
+        system=prompt + (" Copy the exact title and date of each relevant card." if source_url == harvard.SOURCE else ""),
         schema=ExtractionResult,
     )
     response_text = response.text()
@@ -48,11 +49,19 @@ def extract_events(
 
     # Convert to dicts for DB insertion
     events = []
+    cards = {}
+    if source_url == harvard.SOURCE and text.startswith("[{"):
+        cards = {(c["date"], c["title"].casefold()): c for c in json.loads(text)}
     for event in result.events:
         d = event.model_dump()
         d["content_hash"] = event.content_hash()
         d["url"] = source_url
         d["event_url"] = None
+        if cards:
+            card = cards.get((event.date, event.title.casefold()))
+            if card is None:
+                raise ValueError(f"Extracted seminar did not match a Harvard listing: {event.title}")
+            d.update({key: card[key] for key in ("time", "end_time", "event_url")})
         d["tags"] = ", ".join(d["tags"])
         events.append(d)
     return events, log_path
