@@ -65,11 +65,7 @@ def fetch_feed(url: str, timeout: int = 30) -> list[dict]:
 
 
 def _get(url: str, timeout: int = 30) -> requests.Response:
-    """Fetch URL, retrying without SSL verification if cert fails."""
-    try:
-        resp = requests.get(url, timeout=timeout, headers=_HEADERS)
-    except requests.exceptions.SSLError:
-        resp = requests.get(url, timeout=timeout, headers=_HEADERS, verify=False)
+    resp = requests.get(url, timeout=timeout, headers=_HEADERS)
     resp.raise_for_status()
     return resp
 
